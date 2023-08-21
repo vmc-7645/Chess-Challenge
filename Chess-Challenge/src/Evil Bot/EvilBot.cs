@@ -14,10 +14,21 @@ namespace ChessChallenge.Example
         {
             Move[] allMoves = board.GetLegalMoves();
 
+            // Do first available move if time is running out
+            if (timer.MillisecondsRemaining < 200) {
+                return allMoves[0];
+            }
+
+            // Move[] captureMoves = board.GetLegalMoves(true);
+            // // Agressive
+            // if (captureMoves.Length > 0){
+            //     allMoves=captureMoves;
+            // }
+
             // Pick a random move to play if nothing better is found
             Random rng = new();
             Move moveToPlay = allMoves[rng.Next(allMoves.Length)];
-            int highestValueCapture = 0;
+            int highestVal = 0;
 
             foreach (Move move in allMoves)
             {
@@ -28,19 +39,56 @@ namespace ChessChallenge.Example
                     break;
                 }
 
+                // If promotion is a Queen, do it
+                if (move.PromotionPieceType == PieceType.Queen){
+                    moveToPlay = move;
+                }
+
+                // If Move is not a King, do it
+                if (move.MovePieceType == PieceType.King){
+                    continue;
+                }
+
+
                 // Find highest value capture
                 Piece capturedPiece = board.GetPiece(move.TargetSquare);
-                int capturedPieceValue = pieceValues[(int)capturedPiece.PieceType];
+                
+                int currentMoveVal = pieceValues[(int)capturedPiece.PieceType];// weight relative to value of piece capturing
 
-                if (capturedPieceValue > highestValueCapture)
+                // If move is check, add some value
+                if(MoveIsCheck(board, move)){
+                    currentMoveVal+=80;
+                }
+
+                // If square being moved to is attacked, subtract piece value
+                if(board.SquareIsAttackedByOpponent(move.TargetSquare)){
+                    currentMoveVal -= pieceValues[(int)move.MovePieceType];
+                }
+
+                // If current square is attacked, add piece value
+                if(board.SquareIsAttackedByOpponent(move.StartSquare)){
+                    currentMoveVal += pieceValues[(int)move.MovePieceType];
+                }
+
+                if(MoveIsDraw(board, move)){
+                    currentMoveVal -= 1000;
+                }
+                
+                // Set best move
+                if (currentMoveVal > highestVal)
                 {
                     moveToPlay = move;
-                    highestValueCapture = capturedPieceValue;
+                    highestVal = currentMoveVal;
                 }
+
             }
+            
+            // Console.WriteLine("Move value being played "+highestVal);
 
             return moveToPlay;
         }
+
+        // TODO Combine "MoveIs" below to single function, should save some space
 
         // Test if this move gives checkmate
         bool MoveIsCheckmate(Board board, Move move)
@@ -49,6 +97,22 @@ namespace ChessChallenge.Example
             bool isMate = board.IsInCheckmate();
             board.UndoMove(move);
             return isMate;
+        }
+
+        bool MoveIsCheck(Board board, Move move)
+        {
+            board.MakeMove(move);
+            bool isCheck = board.IsInCheck();
+            board.UndoMove(move);
+            return isCheck;
+        }
+
+        bool MoveIsDraw(Board board, Move move)
+        {
+            board.MakeMove(move);
+            bool isDraw = board.IsDraw();
+            board.UndoMove(move);
+            return isDraw;
         }
     }
 }
